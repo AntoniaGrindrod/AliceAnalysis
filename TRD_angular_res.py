@@ -1,4 +1,6 @@
-#Program to 
+#Program to determine angular resolution of the TRD
+#NOTE THAT THIS PROGRAM COULD NOT BE IMPLEMENTED IN THE 2021 REPORT scince no usable scintillator-triggered TRD data was acquired in the correct scintillator-TRD setup
+
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -7,12 +9,12 @@ from scipy.optimize import curve_fit
 
 
 ##Read in o32 to a 3d array (each element is an event; each element in event is an array containing the data points for the 3 channels)
-filename = 'all_oscilloscope_2242.o32'
+filename = 'all_osc_3nov_trial.o32' #this file was a single o32 containing 5 (in this case) merged o32 events from the oscilloscope, when triggered
 file = open(filename)
 
 data_arr = []
 
-for i in range(27): #change 27 to the number of events
+for i in range(5): #change 5 to the number of events in the file
     data_arr.append([])
     for j in range(4):
         file.readline()
@@ -33,8 +35,26 @@ for s in range(len(data_arr)):
         data_arr_new[s][0].append(data_arr[s][t][0]) #channel 1
         data_arr_new[s][1].append(data_arr[s][t][1]) #channel 2
         data_arr_new[s][2].append(data_arr[s][t][2]) #trigger pulse
-    
-##Get Time Difference
+
+#Plot Sample Event to see if any pulse is present
+p = 4 #set p to a random event index
+channel_1 = data_arr_new[p][0]
+channel_2 = data_arr_new[p][1]
+channel_3 = data_arr_new[p][2]
+interval = 4 #time interval in nanoseconds
+times = []
+for i in range(len(channel_1)):
+    times.append(i*interval)
+
+times = np.array(times)
+
+plt.plot(times, channel_1, label = 'Scintillator 1')
+plt.plot(times, channel_2, label = 'Scintillator 2')
+plt.plot(times, channel_3, label = 'Trigger Pulse')
+plt.legend()
+plt.show()
+
+##Get Time Difference (Code adapted from time resolution code)
 
 #Function definition to read in scintillator files into a numpy array
 
@@ -264,11 +284,11 @@ tdArr3 = peakPosC1 - peakPosC2
 ##Find Angle
 distances_arr = [2.865]
 distances = np.array(distances_arr) #array to store distances between scintillators (for use in trial to determine which is optimal distance)
-u_distance = np.sqrt(2)*(0.001)/(2*np.sqrt(6)) #set this value to the uncertainty on the distance was before: u_distance = (0.001)/(2*np.sqrt(6))
-time_res = 5e-9 #use 5ns for trials - maybe change later to actual time res values
-u_time_diff = np.sqrt(2)*time_res #same uncertainty on measured time difference in each case, since this is just propagation from time resolution
+u_distance = 0.204 # the value to the uncertainty on the distance determined by monte carlo simulation
+time_res_1 = 2.774e-9 #time resolution of scintillator 1, determined in time res section of report
+time_res_2 = 2.683e-9
+u_time_diff = np.sqrt(time_res_1**2+time_res_1**2) #this is just propagation from time resolution for each scintillator
 muon_speed = 0.994*3e8
-event_count= np.array([]) #Number of coincident events detected in each trial
 
 #Create 2-d array of scintillator data (each entry is an array storing the scintillator data for each trial)
 #put scintillator 1 and 2 data into this array (entry in each corresponsing position must correspond to same event)
@@ -277,7 +297,7 @@ time_differences = [] #This must be the scintillator on the "left (further from 
 
 
 
-#Create 2-d arrays (an array of d arrays, where d is the number of entries in distances array to store theta data for each trial -DON'T ACTUALLY NEED 2d ARRAYS, but had adapted code from distances_trial
+#Create 2-d arrays (an array of d arrays, where d is the number of entries in distances array to store theta data for each trial -DON'T ACTUALLY NEED 2d ARRAYS, but had adapted code from previous code called distances_trial
 theta_data = []
 u_theta_data = []
 
@@ -321,7 +341,7 @@ for j in range(len(distances)):
                 if time_differences[j][i]<0: #If time of event as measured by 1 is before that of 2, the angle is measured clockwise from the horizontal (so our angle will be whatever we get with the calculation subtracted from 180 deg) otherwise it is measured counterclockwise
                     theta = 180 - theta #note the uncertainty on theta will remain the same
                 
-                if u_theta>5: #Remove angles with uncertainties which are clearly outliers (this condition is rather arbitrary and should be changed - i.e the reason why these data points are giving very high uncertainties should be explored, but we did not have time to do this)
+                if False: #Initial condition was u_theta>5 ,which was to remove angles with uncertainties which are clearly outliers, but this was not actually needed (i.e. this if statement is redundant
                     count_uncertainty_failed[j] = count_uncertainty_failed[j]+1
                 else:
                     theta_data[j].append(theta)
@@ -329,21 +349,7 @@ for j in range(len(distances)):
     
     theta_data[j] = np.array(theta_data[j])
     u_theta_data[j] = np.array(u_theta_data[j])  
+
         
-
-
-u_theta_avg = []
-for i in range(len(theta_data)):
-    u_theta_avg.append(np.mean(u_theta_data[i]))
-
-print("Separation Distance:\t Average Angular Resolution:")
-for i in range(len(distances)):
-    print(distances[i],'\t',np.mean(u_theta_data[i]))
-    
-#for i in range(len(distances)):
-    #print(distances[i])
-    #print(theta_data[i])
-    #print(u_theta_data[i])
-    #print(count_failed[i])
-    #print(count_uncertainty_failed[i]) 
-        
+#CODE IS INCOMPLETE: Still neep to implement the following:
+# Find which events (in the oscilloscope data) correpsonded to tracklet events in the TRD. Then make new array of just these events. For these events, find the difference in the angleas measured by the TRD (you can find angles from path reconstruction) and by the scintillation detectors (these angles are the theta values in the above code). These differences would follow a normal distribution, so you could use a gaussian fit to find the standard deviation on the angular difference. Then take this as the uncertainty on the difference in angles. Using this uncertainty and the uncertainty determined for the scintillation detector angle (which is a function of angle), you can then find a value for the angular resolution of the TRD, via simple uncertainty propagation.
